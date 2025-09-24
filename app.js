@@ -12,6 +12,8 @@ import { prisma } from "./src/config/database.js";
 import { sanitizeRequestBody } from "./src/validators/santizeInput.js";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
+import { CORS_URLS } from "./src/config/constants.js";
+
 
 const swaggerDocument = YAML.load("./docs/openapi.yaml");
 
@@ -20,7 +22,21 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            if (!origin || CORS_URLS.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"]
+    })
+);
+
 app.use(helmet());
 app.use(compression());
 app.use(sanitizeRequestBody);
