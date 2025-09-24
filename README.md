@@ -97,7 +97,7 @@ aggregated_service_booking_platform/
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/<your-username>/aggregated_service_booking_platform.git
+git clone https://github.com/loki4514/aggregated_service_booking_platform.git
 cd aggregated_service_booking_platform
 npm install
 ```
@@ -168,7 +168,7 @@ For quick reference, see `curl` examples in the docs folder.
 
 ---
 
-## ✅ Example Workflow
+##  Example Workflow
 
 1. Customer signs up & logs in
 2. Browse services (`/services`, `/services/search`)
@@ -178,7 +178,7 @@ For quick reference, see `curl` examples in the docs folder.
 
 ---
 
-## 📝 License
+##  License
 
 MIT License © 2025
 
