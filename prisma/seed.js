@@ -420,7 +420,7 @@ async function main() {
     }
 
     // 4. Create Users (Customers and Professionals)
-    console.log('👥 Creating users...');
+    console.log(' Creating users...');
 
     // Create customers
     const customers = [];
@@ -771,7 +771,7 @@ async function main() {
     }
 
     // 11. Create Price Rules
-    console.log("💰 Creating price rules...")
+    console.log(" Creating price rules...")
 
     const samplePriceRules = [
         {
