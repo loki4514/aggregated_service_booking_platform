@@ -1,0 +1,321 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("BOOKING_DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  phone     String   @unique
+  firstName String
+  lastName  String
+  role      UserRole @default(CUSTOMER)
+  pincode   String? // ✅ optional pincode for customers
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  customerBookings Booking[]     @relation("CustomerBookings")
+  professional     Professional?
+  reviews          Review[]
+  addresses        Address[]
+
+  @@index([pincode])
+  @@map("users")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  label     String? // "Home", "Office"
+  line1     String?
+  line2     String?
+  city      String
+  state     String
+  country   String
+  pincode   String
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  isDefault Boolean  @default(false) 
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Booking Booking[]
+}
+
+model Professional {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  businessName  String?
+  description   String?
+  experience    Int      @default(0)
+  rating        Float    @default(0)
+  totalReviews  Int      @default(0)
+  serviceRadius Int      @default(10)
+  isVerified    Boolean  @default(false)
+  isAvailable   Boolean  @default(true)
+  profileImage  String?
+  latitude      Float?
+  longitude     Float?
+  pincode       String? // ✅ professional base location
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings             Booking[]
+  professionalServices ProfessionalService[]
+  availability         Availability[]
+  reviews              Review[]
+  serviceAddons        ProfessionalServiceAddon[] // ✅ reverse relation
+  priceRules           PriceRule[]
+  Slot                 Slot[]
+
+  @@map("professionals")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  services Service[]
+
+  @@map("categories")
+}
+
+model Service {
+  id              String   @id @default(uuid())
+  categoryId      String
+  name            String
+  description     String
+  basePrice       Float
+  durationMinutes Int
+  isActive        Boolean  @default(true)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  category             Category              @relation(fields: [categoryId], references: [id])
+  bookings             Booking[]
+  professionalServices ProfessionalService[]
+  Addon                Addon[]
+  PriceRule            PriceRule[]
+
+  @@map("services")
+}
+
+model ProfessionalService {
+  id             String  @id @default(uuid())
+  professionalId String
+  serviceId      String
+  customPrice    Float?
+  isOffered      Boolean @default(true)
+
+  // Relations
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, serviceId])
+  @@map("professional_services")
+}
+
+model Booking {
+  id                 String        @id @default(uuid())
+  customerId         String
+  professionalId     String
+  serviceId          String
+  
+  // Remove slotId FK - store time directly
+  scheduledAt        DateTime
+  scheduledEndAt     DateTime      // Add end time
+  
+  completedAt        DateTime?
+  status             BookingStatus @default(PENDING)
+  addressId          String
+  price              Float
+  notes              String?
+  cancellationReason String?
+  idempotencyKey     String        @unique
+  paymentStatus      PaymentStatus @default(PENDING)
+  paymentId          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations (no slot relation)
+  customer     User           @relation("CustomerBookings", fields: [customerId], references: [id])
+  professional Professional   @relation(fields: [professionalId], references: [id])
+  service      Service        @relation(fields: [serviceId], references: [id])
+  address      Address        @relation(fields: [addressId], references: [id])
+  review       Review?
+  BookingAddon BookingAddon[]
+
+  // Prevent double booking with time slots
+  @@unique([professionalId, scheduledAt])
+  @@index([customerId])
+  @@index([professionalId, scheduledAt])
+  @@index([status])
+  @@map("bookings")
+}
+
+
+model Availability {
+  id             String  @id @default(uuid())
+  professionalId String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  isAvailable    Boolean @default(true)
+
+  // Relations
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, dayOfWeek, startTime])
+  @@map("availability")
+}
+
+model Review {
+  id             String   @id @default(uuid())
+  bookingId      String   @unique
+  customerId     String
+  professionalId String
+  rating         Int
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  booking      Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer     User         @relation(fields: [customerId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@map("reviews")
+}
+
+model Addon {
+  id          String  @id @default(uuid())
+  serviceId   String
+  name        String
+  description String?
+  basePrice   Float
+  isActive    Boolean @default(true)
+
+  service                  Service                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  ProfessionalServiceAddon ProfessionalServiceAddon[]
+  BookingAddon             BookingAddon[]
+
+  @@unique([serviceId, name])
+  @@map("addons")
+}
+
+model ProfessionalServiceAddon {
+  id             String  @id @default(uuid())
+  professionalId String
+  addonId        String
+  customPrice    Float?
+  isOffered      Boolean @default(true)
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  addon        Addon        @relation(fields: [addonId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, addonId]) // one row per pro-addon combo
+  @@map("professional_service_addons")
+}
+
+model BookingAddon {
+  id        String @id @default(uuid())
+  bookingId String
+  addonId   String
+  quantity  Int    @default(1)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  addon   Addon   @relation(fields: [addonId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, addonId])
+  @@map("booking_addons")
+}
+
+model PriceRule {
+  id             String   @id @default(uuid())
+  professionalId String?
+  serviceId      String?
+  type           RuleType
+  value          Float
+  condition      Json // { "dayOfWeek": [0,6] } or { "distanceKm": ">10" }
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  professional Professional? @relation(fields: [professionalId], references: [id])
+  service      Service?      @relation(fields: [serviceId], references: [id])
+
+  @@map("price_rules")
+}
+
+model Slot {
+  id             String    @id @default(uuid())
+  professionalId String
+  startAt        DateTime
+  endAt          DateTime
+  state          SlotState @default(AVAILABLE)
+  createdAt      DateTime  @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  
+  // Remove booking relation - slots are independent
+
+  @@unique([professionalId, startAt])
+  @@index([professionalId, state])
+  @@map("slots")
+}
+
+
+enum SlotState {
+  AVAILABLE
+  HELD
+  BOOKED
+  BLOCKED
+}
+
+enum RuleType {
+  PERCENTAGE
+  FLAT
+  MULTIPLIER
+}
+
+enum UserRole {
+  CUSTOMER
+  PROFESSIONAL
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
