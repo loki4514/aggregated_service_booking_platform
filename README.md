@@ -436,4 +436,3 @@ MIT License © 2025 - See [LICENSE](LICENSE) for details
 
 ---
 
-**Built with care for the service economy**
