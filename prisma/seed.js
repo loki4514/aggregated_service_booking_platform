@@ -44,10 +44,10 @@ const generatePincode = () => {
 };
 
 async function main() {
-    console.log('🌱 Starting seeding process...');
+    console.log(' Starting seeding process...');
 
     // Clean existing data
-    console.log('🧹 Cleaning existing data...');
+    console.log(' Cleaning existing data...');
     await prisma.bookingAddon.deleteMany({});
     await prisma.booking.deleteMany({});
     await prisma.slot.deleteMany({});
@@ -64,7 +64,7 @@ async function main() {
     await prisma.user.deleteMany({});
 
     // 1. Create Categories
-    console.log('📂 Creating categories...');
+    console.log(' Creating categories...');
     const categories = await Promise.all([
         prisma.category.create({
             data: {
@@ -117,7 +117,7 @@ async function main() {
     ]);
 
     // 2. Create Services for each category
-    console.log('🛠️ Creating services...');
+    console.log(' Creating services...');
     const services = [];
 
     // Home Cleaning Services
@@ -357,7 +357,7 @@ async function main() {
     services.push(...cleaningServices, ...beautyServices, ...repairServices, ...massageServices, ...fitnessServices, ...pestServices);
 
     // 3. Create Addons for services
-    console.log('🔧 Creating addons...');
+    console.log(' Creating addons...');
     const addons = [];
 
     // Cleaning addons
@@ -518,7 +518,7 @@ async function main() {
     }
 
     // 5. Create Professional Services (map professionals to services)
-    console.log('🔗 Creating professional services...');
+    console.log(' Creating professional services...');
 
     const categoryServiceMap = {
         'cleaning': cleaningServices,
@@ -548,7 +548,7 @@ async function main() {
     }
 
     // 6. Create Professional Service Addons
-    console.log('🔧 Creating professional service addons...');
+    console.log(' Creating professional service addons...');
     for (const prof of professionals) {
         const relevantAddons = addons.filter(addon => {
             const service = services.find(s => s.id === addon.serviceId);
@@ -574,7 +574,7 @@ async function main() {
     }
 
     // 7. Create Availability for professionals
-    console.log('📅 Creating availability...');
+    console.log(' Creating availability...');
     for (const prof of professionals) {
         // Create availability for each day of the week
         const availabilityPattern = Math.random() > 0.5 ? 'morning' : 'flexible';
@@ -611,7 +611,7 @@ async function main() {
     }
 
     // 8. Create Addresses for customers
-    console.log('🏠 Creating addresses...');
+    console.log(' Creating addresses...');
     const areas = [
         'Koramangala', 'Indiranagar', 'Whitefield', 'Electronic City', 'HSR Layout',
         'BTM Layout', 'Jayanagar', 'Malleshwaram', 'Rajajinagar', 'Banashankari'
@@ -643,13 +643,13 @@ async function main() {
     }
 
     // 9. Create Time Slots for professionals
-    console.log('⏰ Creating time slots...');
+    console.log(' Creating time slots...');
     const now = new Date();
     const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
     for (const prof of professionals) {
         // Generate slots for next 30 days
-        for (let d = 0; d < 30; d++) {
+        for (let d = 0; d < 35; d++) {
             const date = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
             const dayOfWeek = date.getDay();
 
@@ -691,14 +691,14 @@ async function main() {
     }
 
     // 10. Create some sample bookings
-    console.log('📅 Creating sample bookings...');
+    console.log(' Creating sample bookings...');
     const allSlots = await prisma.slot.findMany({
         where: { state: 'AVAILABLE' }
     });
 
     const customerAddresses = await prisma.address.findMany();
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
         const customer = customers[Math.floor(Math.random() * customers.length)];
         const slot = allSlots[Math.floor(Math.random() * allSlots.length)];
         const professional = professionals.find(p => p.id === slot.professionalId);

@@ -24,7 +24,7 @@ beforeEach(() => {
     // Suppress console output during tests to reduce noise
     console.error = jest.fn();
     console.warn = jest.fn();
-    console.log = jest.fn();
+    // console.log = jest.fn();
 });
 
 afterEach(() => {

@@ -24,7 +24,7 @@ export class UserService {
     async createUser(dto) {
         try {
             // Validate required fields
-            
+
             if (!dto.email || !dto.password) {
                 throw new ValidationError("Email and password are required", "MISSING_REQUIRED_FIELDS")
             }
@@ -100,7 +100,7 @@ export class UserService {
             if (!user) {
                 throw new NotFoundError("User not found", "USER_NOT_FOUND")
             }
-            
+
             const address = await this.addressRepo.create(userId, dto)
             logger.info("UserService - Address created", { id: address.id, userId })
             return address
@@ -165,4 +165,21 @@ export class UserService {
             throw err
         }
     }
+
+    async deleteAddress(addressId) {
+        try {
+            const address = await this.addressRepo.delete(addressId);
+
+            if (!address) {
+                throw new NotFoundError("Address not found", "ADDRESS_NOT_FOUND");
+            }
+
+            logger.info("AddressService - Address deleted", { id: addressId });
+            return { message: "Address deleted successfully" };
+        } catch (err) {
+            logger.error("AddressService - Failed to delete address", { error: err.message });
+            throw err;
+        }
+    }
+
 }

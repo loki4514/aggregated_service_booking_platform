@@ -26,7 +26,7 @@ export function validateParams(schema) {
         }
         
         req.params = value
-        console.log("alid")
+        
         next()
     }
 }

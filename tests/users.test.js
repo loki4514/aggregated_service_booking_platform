@@ -20,12 +20,12 @@ describe('Authentication & User Management Tests', () => {
         await prisma.$connect();
 
         // Clean up existing test data
-        await prisma.booking.deleteMany({});
-        await prisma.address.deleteMany({});
-        await prisma.professional.deleteMany({});
-        await prisma.user.deleteMany({
+        // await prisma.booking.deleteMany({});
+        // await prisma.address.deleteMany({});
+        // await prisma.professional.deleteMany({});
+        // await prisma.user.deleteMany({
 
-        });
+        // });
     });
 
     afterAll(async () => {
@@ -327,17 +327,21 @@ describe('Authentication & User Management Tests', () => {
                         isDefault: true
                     };
 
+                    
+
                     const response = await request(app)
                         .put(`/api/v1/users/addresses`)
                         .set('Authorization', `Bearer ${userToken}`)
                         .send(addressData)
                         .expect(201);
 
+                    
                     expect(response.body.success).toBe(true);
                     expect(response.body.message).toBe('Address created successfully');
                     expect(response.body.data).toBeDefined();
 
-                    addressId = response.body.data.id;
+                    
+                    addressId  = response.body.data.id;
                 });
 
                 it('should reject address creation without token', async () => {
@@ -377,17 +381,18 @@ describe('Authentication & User Management Tests', () => {
                     expect(response.body.error.message).toContain('Pincode must be exactly 6 digits');
                 });
             });
-
-            describe('PATCH /api/v1/addresses/:addressId (Update Address)', () => {
+            
+            describe('PATCH /api/v1/users/addresses/:addressId (Update Address)', () => {
                 it('should update address with valid data and token', async () => {
                     const updateData = {
                         label: 'Office',
                         line1: 'Updated Street Address',
                         city: 'Updated City'
                     };
+                    
 
                     const response = await request(app)
-                        .patch(`/api/v1/addresses/${addressId}`)
+                        .patch(`/api/v1/users/addresses/${addressId}`)
                         .set('Authorization', `Bearer ${userToken}`)
                         .send(updateData)
                         .expect(200);
@@ -400,7 +405,7 @@ describe('Authentication & User Management Tests', () => {
                     const updateData = { city: 'Unauthorized City' };
 
                     const response = await request(app)
-                        .patch(`/api/v1/addresses/${addressId}`)
+                        .patch(`/api/v1/users/addresses/${addressId}`)
                         .send(updateData)
                         .expect(401);
 
@@ -408,10 +413,10 @@ describe('Authentication & User Management Tests', () => {
                 });
             });
 
-            describe('DELETE /api/v1/addresses/:addressId (Delete Address)', () => {
+            describe('DELETE /api/v1/users/addresses/:addressId (Delete Address)', () => {
                 it('should delete address with valid token', async () => {
                     const response = await request(app)
-                        .delete(`/api/v1/addresses/${addressId}`)
+                        .delete(`/api/v1/users/addresses/${addressId}`)
                         .set('Authorization', `Bearer ${userToken}`)
                         .expect(200);
 
@@ -431,14 +436,14 @@ describe('Authentication & User Management Tests', () => {
                     };
 
                     const createResponse = await request(app)
-                        .post(`/api/v1/users/${userId}/addresses`)
+                        .put(`/api/v1/users/addresses`)
                         .set('Authorization', `Bearer ${userToken}`)
                         .send(addressData);
 
                     const newAddressId = createResponse.body.data.id;
 
                     const response = await request(app)
-                        .delete(`/api/v1/addresses/${newAddressId}`)
+                        .delete(`/api/v1/users/addresses/${newAddressId}`)
                         .expect(401);
 
                     expect(response.body.success).toBe(false);

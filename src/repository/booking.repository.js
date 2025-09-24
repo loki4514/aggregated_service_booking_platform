@@ -1,5 +1,7 @@
 import { prisma } from "../config/database.js"
 import logger from "../config/logger.js"
+import { ConflictError } from "../errors/customErrors.js"
+
 
 export class BookingRepository {
     async createBooking(data) {
@@ -23,7 +25,7 @@ export class BookingRepository {
                 data: { state: "BOOKED" }
             }).catch(() => null)
 
-            if (!slot) throw new Error("Slot not available or already booked")
+            if (!slot) throw new ConflictError("Slot not available or already booked", "SLOT_CONFLICT");
 
             // 4. Create booking
             const booking = await tx.booking.create({
@@ -133,7 +135,7 @@ export class BookingRepository {
                 include: {
                     service: true,
                     professional: {
-                        include: { user: { select: { firstName: true, lastName: true } } }
+                        include: { user: { select: { firstName: true, lastName: true, email : true } } }
                     }
                 },
                 orderBy: [
@@ -175,7 +177,7 @@ export class BookingRepository {
                         select: { id: true, name: true, durationMinutes: true, basePrice: true }
                     },
                     professional: {
-                        include: { user: { select: { firstName: true, lastName: true } } }
+                        include: { user: { select: { firstName: true, lastName: true, email : true, phone : true } } }
                     },
                     customer: {
                         select: { firstName: true, lastName: true }

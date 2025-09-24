@@ -67,6 +67,7 @@ router.patch(
 
 router.delete(
     "/addresses/:addressId", 
+    authMiddleware,
     validateParams(Joi.object({
         addressId: Joi.string().uuid().required()
     })), 

@@ -166,7 +166,7 @@ export class BookingService {
         const hoursUntilBooking = (new Date(booking.scheduledAt) - new Date()) / (1000 * 60 * 60)
         if (hoursUntilBooking < 3) {
             throw new ValidationError(
-                "Cannot cancel booking less than 24 hours in advance",
+                "Cannot cancel booking less than 3 hours in advance",
                 "CANCELLATION_TOO_LATE"
             )
         }
