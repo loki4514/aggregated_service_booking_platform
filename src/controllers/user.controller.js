@@ -109,7 +109,7 @@ export class UserController {
     updateAddress = async (req, res, next) => {
         try {
             const { addressId } = req.params
-            const userId = req.user.userId// Assuming you have auth middleware
+            const userId = req.user.userId
 
             const address = await this.userService.updateAddress(addressId, req.body, userId)
 

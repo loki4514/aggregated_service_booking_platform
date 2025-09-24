@@ -1,0 +1,1831 @@
+openapi: 3.1.3
+info:
+  title: Aggregated Service Booking Platform API
+  description: >
+    A production-ready REST API for a simplified Urban Company–like platform where users book services from professionals.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Signup & Login
+  - name: Users
+    description: :Users relatated operations
+  - name: Services
+    description: Catalog of categories and services
+  - name: Professionals
+    description: Professionals and their slots
+  - name: Bookings
+    description: Customer booking operations
+  - name: Reviews
+    description: Ratings and feedback
+  - name: Add-ons
+    description: Add-ons
+
+paths:
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Customer signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: User created successfully
+        "400":
+          description: Validation error
+        "409":
+          description: User already exists
+        "500":
+          description: Internal server error
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: User login (Customer or Professional)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login success with JWT token
+        "401":
+          description: Invalid credentials
+
+  /pro/signup:
+    post:
+      tags: [Auth]
+      summary: Professional signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfessionalSignupRequest"
+      responses:
+        "201":
+          description: Professional account created
+        "400":
+          description: Validation error
+        "409":
+          description: User with this email or phone already exists
+        "500":
+          description: Internal server error
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID (with addresses)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+      responses:
+        "200":
+          description: User details with addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized (missing/invalid token)
+        "404":
+          description: User not found
+
+  /users/addresses:
+    put:
+      summary: Add a new address for the logged-in user
+      description: Allows a customer to add a new address (home/office). A user can have multiple addresses, one of which can be marked as default.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - line1
+                - city
+                - state
+                - country
+                - pincode
+              properties:
+                label:
+                  type: string
+                  enum: [Home, Office]
+                  example: Home
+                line1:
+                  type: string
+                  example: "42 Residency Road"
+                line2:
+                  type: string
+                  example: "Near Central Mall"
+                city:
+                  type: string
+                  example: "Bangalore"
+                state:
+                  type: string
+                  example: "Karnataka"
+                country:
+                  type: string
+                  example: "India"
+                pincode:
+                  type: string
+                  example: "560001"
+                latitude:
+                  type: number
+                  example: 12.9750
+                longitude:
+                  type: number
+                  example: 77.6033
+                isDefault:
+                  type: boolean
+                  example: true
+      responses:
+        "201":
+          description: Address added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Address"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/update-user:
+    patch:
+      summary: Update user profile
+      description: Update details of the logged-in user. At least one field must be provided.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                firstName:
+                  type: string
+                  example: Michael
+                lastName:
+                  type: string
+                  example: Scott
+                phone:
+                  type: string
+                  pattern: "^[0-9]{10}$"
+                  example: "9876543210"
+                pincode:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+                  example: "560001"
+                password:
+                  type: string
+                  minLength: 6
+                  maxLength: 50
+                  example: Secret@123
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Validation error (invalid payload)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (missing/invalid JWT)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict – email or phone already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  users/addresses/{id}:
+    patch:
+    summary: Update an existing address
+    description: Allows a customer to update their saved address fields. Only the fields provided will be updated.
+    tags:
+      - Users
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The UUID of the address to update
+        schema:
+          type: string
+          format: uuid
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              label:
+                type: string
+                enum: [Home, Office]
+                example: Home
+              line1:
+                type: string
+                example: "44 Residency Road"
+              line2:
+                type: string
+                example: "Opposite Big Bazaar"
+              city:
+                type: string
+                example: "Bangalore"
+              state:
+                type: string
+                example: "Karnataka"
+              country:
+                type: string
+                example: "India"
+              pincode:
+                type: string
+                example: "560001"
+              latitude:
+                type: number
+                example: 12.9750
+              longitude:
+                type: number
+                example: 77.6033
+              isDefault:
+                type: boolean
+                example: false
+    responses:
+      "200":
+        description: Address updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: "#/components/schemas/Address"
+      "400":
+        description: Validation error
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "401":
+        description: Unauthorized (JWT missing or invalid)
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "403":
+        description: Forbidden (trying to update another user's address)
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+      "404":
+        description: Address not found
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorResponse"
+
+  /services:
+    get:
+      summary: Get all services
+      description: Returns a paginated list of available services.
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of items per page
+      responses:
+        "200":
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Service"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 42
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 20
+                      totalPages:
+                        type: integer
+                        example: 3
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /services/search:
+    get:
+      summary: Search services
+      description: Search services by keyword (name or description). Supports pagination.
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Search query (e.g., "hair", "ac repair")
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Number of items per page
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Service"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          description: Invalid query or parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /services/{id}:
+    get:
+      summary: Get service by ID
+      description: Retrieve details of a single service by its ID, including category and addons.
+      tags:
+        - Services
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The unique ID of the service
+      responses:
+        "200":
+          description: Service details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Service"
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pro/by-service/{serviceId}:
+    get:
+      summary: Get professionals by service
+      description: Retrieve a paginated list of professionals who offer a given service, along with their next available slots.
+      tags:
+        - Professionals
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: serviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the service to filter professionals
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of professionals per page
+      responses:
+        "200":
+          description: List of professionals offering the service
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProfessionalWithSlots"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "404":
+          description: Service not found or no professionals available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /pro/nearby:
+    get:
+      summary: Find nearby professionals by service and customer address
+      description: >
+        Returns a list of professionals who offer the specified service and are within
+        radius of the given customer address. Includes distance (in km) and their next
+        available slots.
+      tags:
+        - Professionals
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: serviceId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the service the customer is searching for
+        - in: query
+          name: addressId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Customer's address ID to calculate proximity
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of professionals per page
+      responses:
+        "200":
+          description: List of nearby professionals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NearbyProfessional"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+              example:
+                success: true
+                data:
+                  - id: "185b8751-6898-4fe6-a1fd-ec92dbf2d39d"
+                    name: "Sanjana Iyer"
+                    phone: "+919876540006"
+                    email: "sanjana.beauty@email.com"
+                    distanceKm: "19.69"
+                    slots:
+                      - id: "569fe9cf-7ead-417d-b4a8-e62d9b998f14"
+                        professionalId: "185b8751-6898-4fe6-a1fd-ec92dbf2d39d"
+                        startAt: "2025-09-24T09:30:00.000Z"
+                        endAt: "2025-09-24T10:30:00.000Z"
+                        state: "AVAILABLE"
+                      - id: "b49b67a1-332e-46a2-84a6-8af2fa0a77e6"
+                        professionalId: "185b8751-6898-4fe6-a1fd-ec92dbf2d39d"
+                        startAt: "2025-09-24T10:30:00.000Z"
+                        endAt: "2025-09-24T11:30:00.000Z"
+                        state: "AVAILABLE"
+                      - id: "47764a0d-4a5d-4c4d-9d31-2b16412689fe"
+                        professionalId: "185b8751-6898-4fe6-a1fd-ec92dbf2d39d"
+                        startAt: "2025-09-24T11:30:00.000Z"
+                        endAt: "2025-09-24T12:30:00.000Z"
+                        state: "AVAILABLE"
+                pagination:
+                  page: 1
+                  limit: 10
+                  total: 1
+                  totalPages: 1
+        "404":
+          description: Service or address not found, or no professionals nearby
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /addons/professional/{professionalId}:
+    get:
+      summary: Get add-ons offered by a specific professional
+      description: >
+        Returns all add-ons that a professional offers for their services.  
+        Includes base addon details and any custom pricing the professional has set.
+      tags:
+        - Add-ons
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: professionalId
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the professional
+      responses:
+        "200":
+          description: List of add-ons for the given professional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProfessionalAddon"
+              example:
+                success: true
+                data:
+                  - id: "a48e2733-c864-46d3-a796-2e33b0e111db"
+                    professionalId: "fd6c6791-7650-455d-ab73-19db434a41d8"
+                    addonId: "c1e0dc72-848c-4868-b6d2-d177c281c050"
+                    customPrice: null
+                    isOffered: true
+                    addon:
+                      id: "c1e0dc72-848c-4868-b6d2-d177c281c050"
+                      serviceId: "42dd93be-b204-46d7-8305-075d130c26e0"
+                      name: "Hair Wash"
+                      description: "Premium hair wash with conditioner"
+                      basePrice: 99
+                      isActive: true
+        "404":
+          description: Professional not found or no add-ons offered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (JWT missing/invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/estimate:
+    post:
+      summary: Estimate booking price
+      description: >
+        Calculates the total estimated price for a booking based on the selected service, professional, and optional add-ons.  
+        Validates that the professional offers the service and each add-on.
+      tags:
+        - Bookings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - professionalId
+                - serviceId
+              properties:
+                professionalId:
+                  type: string
+                  format: uuid
+                  description: ID of the professional offering the service
+                serviceId:
+                  type: string
+                  format: uuid
+                  description: ID of the service being estimated
+                addonIds:
+                  type: array
+                  description: Optional list of add-on IDs
+                  items:
+                    type: string
+                    format: uuid
+            example:
+              professionalId: "fd6c6791-7650-455d-ab73-19db434a41d8"
+              serviceId: "ba650acd-856d-4854-9c19-b124e41373c4"
+              addonIds:
+                - "ade62716-8a1d-4679-92ab-f78120aa3f21"
+      responses:
+        "200":
+          description: Estimated price details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      price:
+                        $ref: "#/components/schemas/EstimatedPrice"
+              example:
+                success: true
+                data:
+                  price:
+                    service:
+                      id: "ba650acd-856d-4854-9c19-b124e41373c4"
+                      name: "Manicure & Pedicure"
+                      description: "Complete nail care treatment"
+                      durationMinutes: 75
+                      basePrice: 649
+                      customPrice: 752.98
+                      appliedPrice: 752.98
+                    addons:
+                      - id: "ade62716-8a1d-4679-92ab-f78120aa3f21"
+                        name: "Face Mask"
+                        description: "Nourishing face mask treatment"
+                        basePrice: 199
+                        customPrice: null
+                        appliedPrice: 199
+                    totalPrice: 951.98
+        "400":
+          description: Invalid request (service or add-on not offered)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            serviceNotOffered:
+              summary: Service not offered
+              value:
+                success: false
+                error:
+                  code: "SERVICE_NOT_OFFERED"
+                  message: "Professional does not offer this service"
+            addonNotOffered:
+              summary: Add-on not offered
+              value:
+                success: false
+                error:
+                  code: "ADDON_NOT_OFFERED"
+                  message: "Professional does not offer addon ade62716-8a1d-4679-92ab-f78120aa3f21"
+        "401":
+          description: Unauthorized (JWT missing or invalid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/create-booking:
+    post:
+      summary: Create a new booking
+      description: >
+        Creates a booking for a customer with a professional at a specific slot.  
+        Includes validation for address ownership, slot availability, idempotency, and add-ons.  
+        Concurrency-safe using transactions to prevent double booking.
+      tags:
+        - Bookings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - professionalId
+                - serviceId
+                - slotId
+                - addressId
+              properties:
+                professionalId:
+                  type: string
+                  format: uuid
+                  description: ID of the professional being booked
+                serviceId:
+                  type: string
+                  format: uuid
+                  description: ID of the service being booked
+                slotId:
+                  type: string
+                  format: uuid
+                  description: ID of the selected available slot
+                addressId:
+                  type: string
+                  format: uuid
+                  description: ID of the customer’s address (must belong to user)
+                addonIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Optional list of add-on IDs
+                notes:
+                  type: string
+                  maxLength: 500
+                  description: Optional notes (e.g., "Please ring the doorbell")
+            example:
+              professionalId: "fd6c6791-7650-455d-ab73-19db434a41d8"
+              serviceId: "ba650acd-856d-4854-9c19-b124e41373c4"
+              slotId: "87785a28-db33-4650-b509-928c6fb639fd"
+              addressId: "f21a553f-afea-45c0-b8a5-c57f1460e369"
+              addonIds: ["ade62716-8a1d-4679-92ab-f78120aa3f21"]
+              notes: "Please ring the doorbell"
+      responses:
+        "201":
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Booking"
+              example:
+                success: true
+                data:
+                  id: "5069357b-c25a-4fdb-bff7-6da6dd6ec884"
+                  customerId: "33a39956-4489-4dc2-be50-4f7cd7a97e53"
+                  professionalId: "fd6c6791-7650-455d-ab73-19db434a41d8"
+                  serviceId: "ba650acd-856d-4854-9c19-b124e41373c4"
+                  scheduledAt: "2025-09-24T10:30:00.000Z"
+                  scheduledEndAt: "2025-09-24T11:30:00.000Z"
+                  status: "PENDING"
+                  addressId: "f21a553f-afea-45c0-b8a5-c57f1460e369"
+                  price: 1150.98
+                  notes: "Please ring the doorbell"
+                  paymentStatus: "PENDING"
+        "400":
+          description: Validation error (missing/invalid fields)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Address does not belong to the customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: "FORBIDDEN_ADDRESS"
+              message: "You cannot use another user's address"
+        "404":
+          description: Slot or address not found/unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            slotNotFound:
+              summary: Slot not found
+              value:
+                success: false
+                error:
+                  code: "SLOT_NOT_FOUND"
+                  message: "Slot not found or unavailable"
+            addressNotFound:
+              summary: Address not found
+              value:
+                success: false
+                error:
+                  code: "ADDRESS_NOT_FOUND"
+                  message: "Address not found"
+        "409":
+          description: Booking conflict (duplicate or invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            alreadyProcessed:
+              summary: Already processed
+              value:
+                success: false
+                error:
+                  code: "BOOKING_ALREADY_PROCESSED"
+                  message: "Booking already exists with status CONFIRMED"
+            invalidStatus:
+              summary: Invalid status
+              value:
+                success: false
+                error:
+                  code: "INVALID_BOOKING_STATUS"
+                  message: "Booking created but invalid status: CANCELLED"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+
+    get:
+      tags: [Bookings]
+      summary: Get booking by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Booking details
+        "404":
+          description: Booking not found
+
+  /bookings/my-bookings:
+    get:
+      summary: Get customer's bookings
+      description: >
+        Fetch all bookings for the authenticated customer.  
+        Supports optional filtering by booking status and includes pagination metadata.
+      tags:
+        - Bookings
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, CONFIRMED, COMPLETED, CANCELLED]
+          description: Filter bookings by status (case-insensitive).
+          example: COMPLETED
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of records per page
+      responses:
+        "200":
+          description: List of bookings for the customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Booking"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 3
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 10
+                      totalPages:
+                        type: integer
+                        example: 1
+              example:
+                success: true
+                data:
+                  - id: "5069357b-c25a-4fdb-bff7-6da6dd6ec884"
+                    status: "COMPLETED"
+                    scheduledAt: "2025-09-24T10:30:00.000Z"
+                    scheduledEndAt: "2025-09-24T11:30:00.000Z"
+                    service:
+                      id: "ba650acd-856d-4854-9c19-b124e41373c4"
+                      name: "Manicure & Pedicure"
+                    professional:
+                      id: "fd6c6791-7650-455d-ab73-19db434a41d8"
+                      user:
+                        firstName: "Kavya"
+                        lastName: "Rao"
+                    address:
+                      id: "f21a553f-afea-45c0-b8a5-c57f1460e369"
+                      line1: "366, Banashankari"
+                      city: "Bangalore"
+                      pincode: "560027"
+                pagination:
+                  total: 1
+                  page: 1
+                  limit: 10
+                  totalPages: 1
+        "400":
+          description: Invalid status or pagination params
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (missing or invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/professional-bookings:
+    get:
+      summary: Get professional's bookings
+      description: >
+        Fetch all bookings for the authenticated professional.  
+        Supports optional filtering by booking status and includes pagination metadata.  
+        🚨 Only users with the `PROFESSIONAL` role can access this endpoint.
+      tags:
+        - Bookings
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, CONFIRMED, COMPLETED, CANCELLED]
+          description: Filter bookings by status (case-insensitive).
+          example: PENDING
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number for pagination
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of records per page
+      responses:
+        "200":
+          description: List of bookings for the professional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Booking"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 5
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 10
+                      totalPages:
+                        type: integer
+                        example: 1
+              example:
+                success: true
+                data:
+                  - id: "5069357b-c25a-4fdb-bff7-6da6dd6ec884"
+                    status: "PENDING"
+                    scheduledAt: "2025-09-24T10:30:00.000Z"
+                    scheduledEndAt: "2025-09-24T11:30:00.000Z"
+                    customer:
+                      firstName: "Arjun"
+                      lastName: "Sharma"
+                    service:
+                      id: "ba650acd-856d-4854-9c19-b124e41373c4"
+                      name: "Manicure & Pedicure"
+                    address:
+                      line1: "366, Banashankari"
+                      city: "Bangalore"
+                      pincode: "560027"
+                pagination:
+                  total: 2
+                  page: 1
+                  limit: 10
+                  totalPages: 1
+        "403":
+          description: Forbidden — Only professionals can access this route
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "FORBIDDEN_ROLE"
+                  message: "You do not have permission to access this resource"
+        "401":
+          description: Unauthorized (missing or invalid token)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bookings/{bookingId}/status:
+    patch:
+      summary: Update booking status
+      description: >
+        Allows a professional to update a booking's status.  
+        Valid transitions:  
+        - PENDING → CONFIRMED, CANCELLED  
+        - CONFIRMED → COMPLETED, CANCELLED
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: bookingId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [CONFIRMED, COMPLETED, CANCELLED]
+                cancellationReason:
+                  type: string
+                  description: Required if status is CANCELLED
+              required: [status]
+      responses:
+        "200":
+          description: Booking updated successfully
+        "404":
+          description: Booking not found
+        "409":
+          description: Invalid status transition
+
+  /bookings/{id}/cancel:
+    patch:
+      tags:
+        - Bookings
+      summary: Cancel a booking (Customer only)
+      description: >
+        Allows a **customer** to cancel their own booking by providing a cancellation reason.  
+        Returns 404 if booking not found, 403 if trying to cancel someone else's booking,  
+        or 409 if booking cannot be cancelled due to its current status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The ID of the booking to cancel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cancellationReason
+              properties:
+                cancellationReason:
+                  type: string
+                  example: "Customer delayed, cannot make it"
+      responses:
+        "200":
+          description: Booking cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Booking"
+        "400":
+          description: Validation error (missing cancellation reason)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden – booking does not belong to this customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict – booking already processed (cannot cancel)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /reviews/create-review:
+    post:
+      tags:
+        - Reviews
+      summary: Create a review for a booking
+      description: >
+        Allows a **customer** to submit a review for a professional after a completed booking.  
+        A booking must be in `COMPLETED` status, and the customer can only review their own bookings.  
+        Each booking can only have one review (unique constraint).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bookingId
+                - rating
+              properties:
+                bookingId:
+                  type: string
+                  format: uuid
+                  description: The ID of the booking being reviewed
+                  example: "5069357b-c25a-4fdb-bff7-6da6dd6ec884"
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Rating score (1 to 5)
+                  example: 5
+                comment:
+                  type: string
+                  maxLength: 500
+                  description: Optional review text
+                  example: "Excellent service, very professional!"
+      responses:
+        "201":
+          description: Review created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Review"
+        "400":
+          description: Validation error (missing rating or bookingId)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden – customer trying to review someone else’s booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            bookingNotOwned:
+              value:
+                success: false
+                error:
+                  code: "BOOKING_NOT_OWNED"
+                  message: "You can only review your own bookings"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            bookingNotFound:
+              value:
+                success: false
+                error:
+                  code: "BOOKING_NOT_FOUND"
+                  message: "Booking not found"
+        "409":
+          description: Booking not in COMPLETED state or review already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            bookingNotCompleted:
+              value:
+                success: false
+                error:
+                  code: "BOOKING_NOT_COMPLETED"
+                  message: "You can only review completed bookings"
+            duplicateReview:
+              value:
+                success: false
+                error:
+                  code: "P2002"
+                  message: "Unique constraint failed on the fields: (`bookingId`)"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  
+  /reviews/me:
+    get:
+      tags:
+        - Reviews
+      summary: Get all reviews written by the logged-in customer
+      description: >
+        Returns all reviews submitted by the **authenticated customer**.  
+        Includes related booking details and professional info.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+          description: Number of items per page
+      responses:
+        "200":
+          description: List of customer reviews with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewWithRelations"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized – missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /reviews/my-reviews:
+    get:
+      tags:
+        - Reviews
+      summary: Get all reviews for the logged-in professional
+      description: >
+        Returns all reviews that customers have submitted for the **authenticated professional**.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: List of reviews for the professional
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewWithCustomer"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Unauthorized (missing/invalid token)
+        "403":
+          description: Forbidden (only PROFESSIONAL role can access)
+        "500":
+          description: Internal server error
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        id:
+          {
+            type: string,
+            format: uuid,
+            example: "33a39956-4489-4dc2-be50-4f7cd7a97e53",
+          }
+        email:
+          { type: string, format: email, example: "arjun.sharma@email.com" }
+        phone: { type: string, example: "9876543210" }
+        firstName: { type: string, example: "Arjun" }
+        lastName: { type: string, example: "Sharma" }
+        role:
+          {
+            type: string,
+            enum: [CUSTOMER, PROFESSIONAL, ADMIN],
+            example: "CUSTOMER",
+          }
+        pincode: { type: string, example: "560001" }
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Address"
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          enum: [Home, Office]
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        pincode:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 1
+        totalPages:
+          type: integer
+          example: 1
+    SignupRequest:
+      type: object
+      required: [email, password, phone, firstName, lastName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6 }
+        phone: { type: string, example: "9876543210" }
+        firstName: { type: string }
+        lastName: { type: string }
+        pincode: { type: string, example: "560001" }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "42dd93be-b204-46d7-8305-075d130c26e0"
+        name:
+          type: string
+          example: "Haircut"
+        description:
+          type: string
+          example: "Basic haircut for men"
+        basePrice:
+          type: number
+          format: float
+          example: 299.99
+        durationMinutes:
+          type: integer
+          example: 60
+        category:
+          $ref: "#/components/schemas/Category"
+        addons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Addon"
+
+    ProfessionalWithSlots:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "fd6c6791-7650-455d-ab73-19db434a41d8"
+        businessName:
+          type: string
+          example: "Kavya's Beauty Service"
+        description:
+          type: string
+          example: "Professional beauty service provider with years of experience"
+        experience:
+          type: integer
+          example: 7
+        rating:
+          type: number
+          format: float
+          example: 4.5
+        totalReviews:
+          type: integer
+          example: 120
+        serviceRadius:
+          type: integer
+          example: 15
+        isVerified:
+          type: boolean
+          example: true
+        isAvailable:
+          type: boolean
+          example: true
+        profileImage:
+          type: string
+          format: uri
+          example: "https://api.dicebear.com/7.x/personas/svg?seed=Kavya"
+        user:
+          type: object
+          properties:
+            firstName:
+              type: string
+              example: "Kavya"
+            lastName:
+              type: string
+              example: "Rao"
+            email:
+              type: string
+              example: "kavya.beauty@email.com"
+            phone:
+              type: string
+              example: "+919876540004"
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/Slot"
+
+    Slot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "569fe9cf-7ead-417d-b4a8-e62d9b998f14"
+        professionalId:
+          type: string
+          format: uuid
+          example: "185b8751-6898-4fe6-a1fd-ec92dbf2d39d"
+        startAt:
+          type: string
+          format: date-time
+          example: "2025-09-24T09:30:00.000Z"
+        endAt:
+          type: string
+          format: date-time
+          example: "2025-09-24T10:30:00.000Z"
+        state:
+          type: string
+          enum: [AVAILABLE, BOOKED, HELD]
+          example: "AVAILABLE"
+
+    EstimatedPrice:
+      type: object
+      properties:
+        service:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            description: { type: string }
+            durationMinutes: { type: integer }
+            basePrice: { type: number }
+            customPrice: { type: number, nullable: true }
+            appliedPrice: { type: number }
+        addons:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              description: { type: string }
+              basePrice: { type: number }
+              customPrice: { type: number, nullable: true }
+              appliedPrice: { type: number }
+        totalPrice:
+          type: number
+
+    CreateBookingRequest:
+      type: object
+      required: [professionalId, serviceId, slotId, addressId]
+      properties:
+        professionalId: { type: string, format: uuid }
+        serviceId: { type: string, format: uuid }
+        slotId: { type: string, format: uuid }
+        addressId: { type: string, format: uuid }
+        addonIds:
+          type: array
+          items: { type: string, format: uuid }
+        notes: { type: string }
+
+    CreateReviewRequest:
+      type: object
+      required: [bookingId, rating]
+      properties:
+        bookingId: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string }
+        
+    ProfessionalSignupRequest:
+      type: object
+      required:
+        - email
+        - password
+        - phone
+        - firstName
+        - lastName
+        - businessName
+        - pincode
+      properties:
+        email:
+          type: string
+          format: email
+          example: "mark.taylor@example.com"
+        password:
+          type: string
+          minLength: 6
+          example: "Default@123"
+        phone:
+          type: string
+          example: "9123456789"
+        firstName:
+          type: string
+          example: "Mark"
+        lastName:
+          type: string
+          example: "Taylor"
+        businessName:
+          type: string
+          example: "Taylor Repairs"
+        description:
+          type: string
+          example: "Expert in AC repair and home appliances"
+        experience:
+          type: integer
+          example: 5
+        latitude:
+          type: number
+          example: 12.9716
+        longitude:
+          type: number
+          example: 77.5946
+        pincode:
+          type: string
+          example: "560002"
+

@@ -10,6 +10,11 @@ import routes from "./src/routes/index.js";
 import { errorHandler } from "./src/middleware/error.middleware.js";
 import { prisma } from "./src/config/database.js";
 import { sanitizeRequestBody } from "./src/validators/santizeInput.js";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yamljs";
+
+const swaggerDocument = YAML.load("./docs/openapi.yaml");
+
 
 dotenv.config();
 
@@ -29,6 +34,7 @@ app.use(morgan(":method :url :status - :response-time ms :id", {
 app.use("/api/v1", routes);
 
 app.use(errorHandler);
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.get("/", (req, res) => {
     res.json({ message: "Aggregated Service Booking Platform is running!" });
