@@ -14,15 +14,15 @@ export function errorHandler(err, req, res, next) {
     const statusCode = err.status || 500;
 
     // Only expose safe messages
-    const safeMessage = err.isOperational   // e.g. your custom AppError
-        ? err.message                       // safe to show
-        : "Something went wrong, please try again later.";
+    // const safeMessage = err.isOperational   // e.g. your custom AppError
+    //     ? err.message                       // safe to show
+    //     : "Something went wrong, please try again later.";
 
     res.status(statusCode).json({
         success: false,
         error: {
             code: err.code || "INTERNAL_ERROR",
-            message: safeMessage,
+            message: err.message || "Something went wrong, please try again later.",
         },
     });
 }

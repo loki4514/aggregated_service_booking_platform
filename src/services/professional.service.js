@@ -1,8 +1,9 @@
 import logger from "../config/logger.js"
 import { ProfessionalRepository } from "../repository/professional.repository.js"
-import { ConflictError } from "../errors/customErrors.js"
+import { ConflictError, NotFoundError } from "../errors/customErrors.js"
 import { UserService } from "./user.service.js"
 import { ServiceRepository } from "../repository/service.repository.js"
+
 
 export class ProfessionalService {
     constructor() {
