@@ -1,81 +1,110 @@
 import { prisma } from "../config/database.js"
 import logger from "../config/logger.js"
-import { ConflictError } from "../errors/customErrors.js"
+import { ConflictError, NotFoundError } from "../errors/customErrors.js"
 
 
 export class BookingRepository {
+
     async createBooking(data) {
+        try {
+            return await prisma.$transaction(async (tx) => {
+                // 1. Check idempotency
+                const existing = await tx.booking.findUnique({
+                    where: { idempotencyKey: data.idempotencyKey }
+                })
+                if (existing) return existing
 
-        return prisma.$transaction(async (tx) => {
-            // 1. Check idempotency
-            const existing = await tx.booking.findUnique({
-                where: { idempotencyKey: data.idempotencyKey }
-            })
-            if (existing) return existing
-
-            // 2. Verify address belongs to user
-            const address = await tx.address.findFirst({
-                where: { id: data.addressId, userId: data.customerId }
-            })
-            if (!address) throw new Error("Invalid address for this customer")
-
-            // 3. Lock slot (atomic update)
-            const slot = await tx.slot.update({
-                where: { id: data.slotId, state: "AVAILABLE" },
-                data: { state: "BOOKED" }
-            }).catch(() => null)
-
-            if (!slot) throw new ConflictError("Slot not available or already booked", "SLOT_CONFLICT");
-
-            // 4. Create booking
-            const booking = await tx.booking.create({
-                data: {
-                    customerId: data.customerId,
-                    professionalId: data.professionalId,
-                    serviceId: data.serviceId,
-                    scheduledAt: slot.startAt,
-                    scheduledEndAt: slot.endAt,
-                    addressId: data.addressId,
-                    price: Number(parseFloat(data.totalPrice).toFixed(2)),
-                    notes: data.notes,
-                    idempotencyKey: data.idempotencyKey
-                },
-                include: {
-                    service: true,
-                    professional: { include: { user: { select: { firstName: true, lastName: true } } } },
-                    address: true,
-                    BookingAddon: { include: { addon: true } }
+                // 2. Verify address belongs to user
+                const address = await tx.address.findFirst({
+                    where: { id: data.addressId, userId: data.customerId }
+                })
+                if (!address) {
+                    throw new NotFoundError("Invalid address for this customer", 404)
                 }
-            })
 
-            // 5. Add addons
-            if (data.addonIds?.length) {
-                await Promise.all(
-                    data.addonIds.map(addonId =>
-                        tx.bookingAddon.upsert({
-                            where: {
-                                bookingId_addonId: {   // ✅ composite unique key
+                // 3. Lock slot (atomic update)
+                const slot = await tx.slot.update({
+                    where: { id: data.slotId, state: "AVAILABLE" },
+                    data: { state: "BOOKED" }
+                }).catch(() => null)
+
+                if (!slot) {
+                    throw new ConflictError("Slot not available or already booked. Please choose another slot.", "SLOT_CONFLICT");
+                }
+
+                // 4. Create booking
+                const booking = await tx.booking.create({
+                    data: {
+                        customerId: data.customerId,
+                        professionalId: data.professionalId,
+                        serviceId: data.serviceId,
+                        scheduledAt: slot.startAt,
+                        scheduledEndAt: slot.endAt,
+                        addressId: data.addressId,
+                        price: Number(parseFloat(data.totalPrice).toFixed(2)),
+                        notes: data.notes,
+                        idempotencyKey: data.idempotencyKey
+                    },
+                    include: {
+                        service: true,
+                        professional: { include: { user: { select: { firstName: true, lastName: true } } } },
+                        address: true,
+                        BookingAddon: { include: { addon: true } }
+                    }
+                })
+
+                // 5. Add addons
+                if (data.addonIds?.length) {
+                    await Promise.all(
+                        data.addonIds.map(addonId =>
+                            tx.bookingAddon.upsert({
+                                where: {
+                                    bookingId_addonId: {   // ✅ composite unique key
+                                        bookingId: booking.id,
+                                        addonId
+                                    }
+                                },
+                                update: {
+                                    quantity: { increment: 1 }  // ✅ increase if exists
+                                },
+                                create: {
                                     bookingId: booking.id,
-                                    addonId
+                                    addonId,
+                                    quantity: 1
                                 }
-                            },
-                            update: {
-                                quantity: { increment: 1 }  // ✅ increase if exists
-                            },
-                            create: {
-                                bookingId: booking.id,
-                                addonId,
-                                quantity: 1
-                            }
-                        })
+                            })
+                        )
                     )
-                )
+                }
+
+                logger.info("BookingRepository - Booking created", { bookingId: booking.id })
+                return booking
+            })
+        } catch (error) {
+            // Handle specific Prisma unique constraint violation
+            if (error.code === 'P2002' && error.meta?.target?.includes('professionalId') && error.meta?.target?.includes('scheduledAt')) {
+                throw new ConflictError("This time slot is already booked for this professional. Please choose another slot.", "BOOKING_TIME_CONFLICT");
             }
 
+            // Handle slot not found
+            if (error.code === 'P2025') {
+                throw new NotFoundError("Selected slot not found. Please choose another slot.", 404);
+            }
 
-            logger.info("BookingRepository - Booking created", { bookingId: booking.id })
-            return booking
-        })
+            // Re-throw custom errors as-is
+            if (error instanceof NotFoundError || error instanceof ConflictError) {
+                throw error;
+            }
+
+            // Handle any other database errors
+            logger.error("BookingRepository - Booking creation failed", {
+                error: error.message,
+                code: error.code,
+                data
+            });
+
+            throw new Error("Failed to create booking. Please try again or choose another slot.");
+        }
     }
 
 
@@ -135,7 +164,7 @@ export class BookingRepository {
                 include: {
                     service: true,
                     professional: {
-                        include: { user: { select: { firstName: true, lastName: true, email : true } } }
+                        include: { user: { select: { firstName: true, lastName: true, email: true } } }
                     }
                 },
                 orderBy: [
@@ -177,7 +206,7 @@ export class BookingRepository {
                         select: { id: true, name: true, durationMinutes: true, basePrice: true }
                     },
                     professional: {
-                        include: { user: { select: { firstName: true, lastName: true, email : true, phone : true } } }
+                        include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } }
                     },
                     customer: {
                         select: { firstName: true, lastName: true }
@@ -239,7 +268,7 @@ export class BookingRepository {
                 where: {
                     professionalId: booking.professionalId,
                     startAt: booking.scheduledAt,
-                    state: "BOOKED" // ✅ only touch booked slots
+                    state: "BOOKED" //  only touch booked slots
                 },
                 data: { state: slotState }
             });
